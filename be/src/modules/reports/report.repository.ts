@@ -146,4 +146,9 @@ export class ReportRepository {
       WHERE id = ${id}
     `
   }
+  
+  async flagReport(reportId: number): Promise<void> {
+    await sql`UPDATE reports SET is_flagged = true WHERE id = ${reportId}`;
+  }
+
 }

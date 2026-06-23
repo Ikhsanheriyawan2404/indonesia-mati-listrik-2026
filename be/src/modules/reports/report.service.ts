@@ -1,6 +1,8 @@
 import { ReportRepository, Report } from './report.repository'
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../shared/utils/errors'
 import { z } from 'zod'
+import { AiModerationService } from '../../shared/services/ai-moderation.service'
+import { env } from '../../config/env'
 
 export const createReportSchema = z.object({
   reporter_name: z.string()
@@ -47,7 +49,11 @@ export const getReportsQuerySchema = z.object({
 )
 
 export class ReportService {
-  constructor(private reportRepository: ReportRepository) {}
+  private readonly aiModerationService: AiModerationService
+
+  constructor(private reportRepository: ReportRepository) {
+    this.aiModerationService = new AiModerationService(env.AI_API_KEY)
+  }
 
   async createReport(guestId: string, data: unknown): Promise<Report> {
     const validated = createReportSchema.parse(data)
@@ -56,10 +62,24 @@ export class ReportService {
       ...validated,
       guest_id: guestId,
     })
+    
+    this.runBackgroundModeration(Number(report.id), validated)
+    
     const now = new Date()
     return {
       ...report,
       status: new Date(report.started_at) < now ? 'history' : 'schedule'
+    }
+  }
+
+  private async runBackgroundModeration(reportId: number, input: any): Promise<void> {
+    try {
+      const result = await this.aiModerationService.moderate(input)
+      if (!result.is_safe) {
+        await this.reportRepository.flagReport(reportId)
+      }
+    } catch (e) {
+      console.error('Moderation error', e)
     }
   }
 

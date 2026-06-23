@@ -14,6 +14,6 @@ reportsRouter.use('*', guestIdMiddleware())
 
 reportsRouter.post('/', reportHandler.create)
 reportsRouter.get('/', reportHandler.getAll)
-reportsRouter.delete('/:id', reportHandler.delete)
+// reportsRouter.delete('/:id', reportHandler.delete)
 
 export default reportsRouter

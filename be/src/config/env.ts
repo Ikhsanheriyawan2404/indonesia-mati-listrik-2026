@@ -14,6 +14,8 @@ const envSchema = z.object({
   REDIS_PORT: z.string().default('6379').transform((val) => parseInt(val, 10)),
   REDIS_PASSWORD: z.string().optional().nullable(),
   REDIS_DB: z.string().default('0').transform((val) => parseInt(val, 10)),
+  
+  AI_API_KEY: z.string()
 })
 
 const parsed = envSchema.safeParse(Bun.env)
