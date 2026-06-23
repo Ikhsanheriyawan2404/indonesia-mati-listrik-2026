@@ -5,8 +5,8 @@ Alasan (reason) maksimal 4 kata.
 Schema: {"is_safe":boolean,"reason":string}`;
 
 export interface ModerationInput {
-  reporter_name: string;
-  description: string;
+  reporter_name: string | null;
+  description: string | null;
 }
 
 export interface ModerationResult {

@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
+import { upgradeWebSocket, websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
 import { ZodError } from 'zod'
 import { initDatabase } from './config/database'
 import { env } from './config/env'
 import reportsRouter from './modules/reports/report.route'
 import { rateLimiter } from './shared/middleware/rate-limiter'
+import { moderationBroadcaster } from './shared/services/moderation-broadcaster.service'
 
 await initDatabase()
 
@@ -26,6 +28,22 @@ app.get('/health', (c) => {
     timestamp: new Date().toISOString()
   })
 })
+
+app.get('/ws/reports/moderation', upgradeWebSocket(() => ({
+  onOpen: (_event, ws) => {
+    moderationBroadcaster.add(ws)
+    ws.send(JSON.stringify({ type: 'connected' }))
+  },
+  onMessage: (event, ws) => {
+    moderationBroadcaster.handleMessage(ws, event.data)
+  },
+  onClose: (_event, ws) => {
+    moderationBroadcaster.remove(ws)
+  },
+  onError: (_event, ws) => {
+    moderationBroadcaster.remove(ws)
+  },
+})))
 
 // routing disini
 app.route('/reports', reportsRouter)
@@ -71,7 +89,10 @@ app.onError((err, c) => {
   }, 500)
 })
 
-export default {
+const server = Bun.serve({
   port: env.PORT,
-  fetch: app.fetch
-}
+  fetch: app.fetch,
+  websocket
+})
+
+moderationBroadcaster.setServer(server)

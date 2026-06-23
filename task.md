@@ -30,14 +30,14 @@
 * [x] `POST /reports` — buat laporan baru
 * [x] `GET /reports?bbox=` — get semua laporan (bbox query)
 * [x] `DELETE /reports/:id` — hapus laporan berdasarkan kepemilikan `guest_id`
-* [ ] `GET /reports/:id` — detail satu laporan + aggregasi realtime vote count up/down
+* [ ] ~~GET /reports/:id — detail satu laporan + aggregasi realtime vote count up/down~~
 * [ ] `POST /reports/:id/votes` — upvote / downvote dengan smart toggle & switch logic per `guest_id`
 
 ### Business Logic & Integrations
 
 * [x] Refactor & fix status derivation agar presisi (`SCHEDULED`, `HISTORY` via Service threshold)
-* [ ] **AI Moderation:** Setup DeepSeek client + logic content moderation async (cek toxicity/relevancy pada `reporter_name` & `description`, auto-flag `is_flagged = true`)
-* [ ] **Reverse Geocoding:** Integrasi OpenStreetMap Nominatim API untuk translate koordinat `lat, lng` menjadi nama lokasi manusiawi saat user pasang titik map
+* [x] **AI Moderation:** Setup DeepSeek client + logic content moderation async (cek toxicity/relevancy pada `reporter_name` & `description`, auto-flag `is_flagged = true`)
+* [x] **Reverse Geocoding:** Integrasi OpenStreetMap Nominatim API untuk translate koordinat `lat, lng` menjadi nama lokasi manusiawi saat user pasang titik map
 
 ---
 
@@ -63,16 +63,19 @@
 * [x] Layer `unclustered-point` (circle individual per status)
 * [x] Klik cluster → zoom in (`getClusterExpansionZoom`)
 * [x] Event `moveend` + debounce 300ms → fetch ulang data by bbox & update source data
-* [ ] Klik individual marker → tampilkan popup detail (ambil data dinamis dari `GET /reports/:id`)
+* [ ] ~~Klik individual marker → tampilkan popup detail (ambil data dinamis dari `GET /reports/:id`)~~
 
 ### Komponen UI & Interaksi
 
 * [x] `Legend.tsx` — top left, penanda warna merah history & biru schedule
 * [x] `ReportModal.tsx` — FAB + Long press map to trigger dialog form tambah laporan
-* [ ] Integrasi nama lokasi otomatis hasil reverse geocoding Nominatim di `ReportModal.tsx` (bukan cuma angka koordinat mentah)
+* [x] Integrasi nama lokasi otomatis hasil reverse geocoding Nominatim di `ReportModal.tsx` (bukan cuma angka koordinat mentah)
 * [x] Dynamic Popup Component (saat marker diklik):
 * [ ] Tombol interaktif Upvote / Downvote (berubah state warna jika aktif, hit `POST /reports/:id/votes`)
 * [ ] Tampilkan jumlah total count vote up dan down secara realtime
+* [x] bugs marker lama munculnya setelah create/post report (harus nunggu geser/zoomin/out)
+* [x] realtime notif post report tidak diterima (kena flaged) (websocket)
+* [ ] ~~tombol hapus report punya sendiri~~
 
 ---
 

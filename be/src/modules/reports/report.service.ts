@@ -3,6 +3,7 @@ import { NotFoundError, ForbiddenError, BadRequestError } from '../../shared/uti
 import { z } from 'zod'
 import { AiModerationService } from '../../shared/services/ai-moderation.service'
 import { env } from '../../config/env'
+import { moderationBroadcaster } from '../../shared/services/moderation-broadcaster.service'
 
 export const createReportSchema = z.object({
   reporter_name: z.string()
@@ -63,7 +64,14 @@ export class ReportService {
       guest_id: guestId,
     })
     
-    this.runBackgroundModeration(Number(report.id), validated)
+    const hasReporter = (report.reporter_name?.trim()?.length ?? 0) > 0;
+    const hasDescription = (report.description?.trim()?.length ?? 0) > 0;
+    if (hasReporter || hasDescription) {
+      this.runBackgroundModeration(Number(report.id), {
+        reporter_name: validated.reporter_name ?? null,
+        description: validated.description ?? null
+      });
+    }
     
     const now = new Date()
     return {
@@ -72,14 +80,31 @@ export class ReportService {
     }
   }
 
-  private async runBackgroundModeration(reportId: number, input: any): Promise<void> {
+  private async runBackgroundModeration(
+    reportId: number,
+    input: { reporter_name: string | null; description: string | null }
+  ): Promise<void> {
+    const reportText = `${input.reporter_name || 'Anonim'}: ${input.description || 'Tidak ada deskripsi'}`
     try {
       const result = await this.aiModerationService.moderate(input)
       if (!result.is_safe) {
         await this.reportRepository.flagReport(reportId)
       }
+
+      moderationBroadcaster.broadcast({
+        type: 'moderation_result',
+        report_data: String(reportText),
+        is_flagged: !result.is_safe,
+        reason: result.reason,
+      })
     } catch (e) {
       console.error('Moderation error', e)
+      moderationBroadcaster.broadcast({
+        type: 'moderation_result',
+        report_data: String(reportText),
+        is_flagged: false,
+        reason: 'Validasi gagal',
+      })
     }
   }
 
