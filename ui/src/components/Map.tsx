@@ -10,6 +10,7 @@ const CLUSTERS_LAYER = 'clusters'
 const CLUSTER_COUNT_LAYER = 'cluster-count'
 const UNCLUSTERED_LAYER = 'unclustered-point'
 const OPEN_REPORT_MODAL_EVENT = 'open-report-modal'
+const TEMP_REPORT_EVENT = 'temp-report'
 const LONG_PRESS_MS = 650
 
 function formatReportTime(startedAtStr: string | null): string {
@@ -51,7 +52,17 @@ export function Map() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const popupRef = useRef<maplibregl.Popup | null>(null)
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reportsRef = useRef<Report[]>([])
   const { registerMap, selectPoint } = useLocation()
+
+  const setReportsData = useCallback((map: maplibregl.Map, reports: Report[]) => {
+    reportsRef.current = reports
+
+    const source = map.getSource(REPORTS_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+
+    source.setData(reportsToGeoJSON(reports))
+  }, [])
 
   const fetchReports = useCallback(async (map: maplibregl.Map) => {
     const bounds = map.getBounds()
@@ -68,12 +79,9 @@ export function Map() {
       const res = await api<ApiResponse<Report[]>>(`/reports?${params.toString()}`)
       const reports = res.data ?? []
 
-      const source = map.getSource(REPORTS_SOURCE) as maplibregl.GeoJSONSource | undefined
-      if (!source) return
-
-      source.setData(reportsToGeoJSON(reports))
+      setReportsData(map, reports)
     } catch {}
-  }, [])
+  }, [setReportsData])
 
   const handleMoveEnd = useCallback(
     (map: maplibregl.Map) => {
@@ -125,6 +133,18 @@ export function Map() {
       new maplibregl.GeolocateControl({ trackUserLocation: true }),
       "top-right"
     );
+
+    const handleTempReport = (event: Event) => {
+      const report = (event as CustomEvent<Report>).detail
+      if (!report?.id) return
+
+      const nextReports = [
+        report,
+        ...reportsRef.current.filter((item) => item.id !== report.id),
+      ]
+
+      setReportsData(map, nextReports)
+    }
 
     map.on('load', () => {
       // GeoJSON source with clustering enabled
@@ -195,6 +215,8 @@ export function Map() {
 
       // Initial data fetch
       fetchReports(map)
+
+      window.addEventListener(TEMP_REPORT_EVENT, handleTempReport as EventListener)
 
       // Debounced fetch on viewport change
       map.on('moveend', () => handleMoveEnd(map))
@@ -318,10 +340,11 @@ export function Map() {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       if (longPressRef.current) clearTimeout(longPressRef.current)
       if (popupRef.current) popupRef.current.remove()
+      window.removeEventListener(TEMP_REPORT_EVENT, handleTempReport as EventListener)
       map.remove()
       mapRef.current = null
     }
-  }, [fetchReports, handleMoveEnd, registerMap, selectPoint])
+  }, [fetchReports, handleMoveEnd, registerMap, selectPoint, setReportsData])
 
   return (
     <div

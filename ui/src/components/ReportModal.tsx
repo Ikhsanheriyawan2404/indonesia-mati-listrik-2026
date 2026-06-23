@@ -32,6 +32,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
 const OPEN_REPORT_MODAL_EVENT = 'open-report-modal'
+const TEMP_REPORT_EVENT = 'temp-report'
 
 interface FormState {
   reporter_name: string
@@ -297,12 +298,13 @@ export function ReportModal() {
         source: 'CROWDSOURCED',
       }
 
-      await api<ApiResponse<Report>>('/reports', {
+      const res = await api<ApiResponse<Report>>('/reports', {
         method: 'POST',
         body: JSON.stringify(payload),
       })
 
-      toast.success('Laporan berhasil disimpan.')
+      toast.success('Laporan dikirim, menunggu verifikasi.')
+      window.dispatchEvent(new CustomEvent(TEMP_REPORT_EVENT, { detail: res.data }))
       finalizeMarker()
       resetForm()
       setOpen(false)
