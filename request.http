@@ -1,0 +1,70 @@
+@BASE_URL = http://localhost:3000
+
+### Healthcheck Endpoint
+GET {{BASE_URL}}/health
+Accept: application/json
+
+### Get All Reports with bbox
+GET {{BASE_URL}}/reports?minLng=111.73858326326945&minLat=-12.399505523206258&maxLng=124.2614167367247&maxLat=10.439100368630264
+Accept: application/json
+
+### Get All Reports
+GET {{BASE_URL}}/reports
+Accept: application/json
+
+###
+
+### Create Report (Valid Request)
+POST {{BASE_URL}}/reports
+Content-Type: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
+
+{
+  "reporter_name": "Agus Salim",
+  "latitude": -1,
+  "longitude": 118,
+  "description": "Terjadi pemadaman listrik total di area Pancoran sejak pukul 19:00 WIB."
+}
+
+###
+
+### Create Report (Invalid Validation)
+POST {{BASE_URL}}/reports
+Content-Type: application/json
+X-Guest-ID: my-test-guest-id-1
+
+{
+  "reporter_name": "Aa",
+  "description": "Padam"
+}
+
+###
+
+### Create Report (Fallback Guest ID)
+POST {{BASE_URL}}/reports
+Content-Type: application/json
+
+{
+  "reporter_name": "Siti Aminah",
+  "latitude": -6.2201,
+  "longitude": 106.8152,
+  "description": "Lampu padam merata di pemukiman warga kelurahan Kuningan Barat."
+}
+
+###
+
+### Delete Report (Authorized - Using matching X-Guest-ID)
+DELETE {{BASE_URL}}/reports/16
+Accept: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
+
+###
+
+### Delete Report (Unauthorized - Using different X-Guest-ID)
+DELETE {{BASE_URL}}/reports/14
+Accept: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-hahaha
+
+
+###
+GET https://nominatim.openstreetmap.org/reverse?lat=-1&lon=118&format=json
