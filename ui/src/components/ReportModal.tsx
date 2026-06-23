@@ -11,9 +11,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { api } from '@/lib/api'
+import { api, reverseGeocode } from '@/lib/api'
 import { type ApiResponse, type Report } from '@/lib/types'
-import { Loader2, Plus, UserX, CalendarIcon } from 'lucide-react'
+import { Loader2, Plus, UserX, CalendarIcon, MapPin } from 'lucide-react'
 
 import {
   Select,
@@ -181,7 +181,7 @@ const getEndedAtDate = (type: string, startedAtDate: Date, customVal?: Date): Da
       return new Date(startedAtDate.getTime() + 60 * 60 * 1000)
     case '2h':
       return new Date(startedAtDate.getTime() + 2 * 60 * 60 * 1000)
-    case '4h':
+    case '3h':
       return new Date(startedAtDate.getTime() + 4 * 60 * 60 * 1000)
     case 'now':
       return now
@@ -199,6 +199,9 @@ export function ReportModal() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [anonymous, setAnonymous] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
+
+  const [locationLabel, setLocationLabel] = useState<string>('')
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false)
 
   const [startedAtType, setStartedAtType] = useState<string>('now')
   const [customStartedAt, setCustomStartedAt] = useState<Date>(new Date())
@@ -312,6 +315,25 @@ export function ReportModal() {
   }
 
   useEffect(() => {
+    if (!selected) {
+      setLocationLabel('')
+      return
+    }
+
+    setLocationLabel(`${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`)
+    setIsGeocodingLocation(true)
+
+    let cancelled = false
+    reverseGeocode(selected.latitude, selected.longitude).then((displayName) => {
+      if (cancelled) return
+      setIsGeocodingLocation(false)
+      if (displayName) setLocationLabel(displayName)
+    })
+
+    return () => { cancelled = true }
+  }, [selected])
+
+  useEffect(() => {
     const openReportModal = () => setOpen(true)
 
     window.addEventListener(OPEN_REPORT_MODAL_EVENT, openReportModal)
@@ -394,13 +416,25 @@ export function ReportModal() {
 
             {/* Lokasi (required) */}
             <div className="space-y-1.5">
-              <Label htmlFor="location">Lokasi</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="location">
+                  <MapPin className="inline-block size-3.5 mr-1 text-muted-foreground" aria-hidden="true" />
+                  Lokasi
+                </Label>
+                {isGeocodingLocation && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                    Mencari alamat…
+                  </span>
+                )}
+              </div>
               <Input
                 id="location"
                 disabled
                 placeholder="Pilih titik pada peta…"
-                value={selected ? `${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}` : ''}
-                className="bg-muted/30"
+                value={locationLabel}
+                title={locationLabel}
+                className="bg-muted/30 truncate"
               />
             </div>
 
@@ -461,8 +495,7 @@ export function ReportModal() {
                   <SelectItem value="unknown">Tidak tahu (default)</SelectItem>
                   <SelectItem value="1h">1 jam</SelectItem>
                   <SelectItem value="2h">2 jam</SelectItem>
-                  <SelectItem value="4h">4 jam</SelectItem>
-                  <SelectItem value="now">Sudah nyala</SelectItem>
+                  <SelectItem value="3h">3 jam</SelectItem>
                   <SelectItem value="custom">Pilih tanggal...</SelectItem>
                 </SelectContent>
               </Select>

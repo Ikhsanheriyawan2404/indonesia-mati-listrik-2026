@@ -19,3 +19,25 @@ export const api = async <T = any>(endpoint: string, options: RequestInit = {}):
 
   return res.json() as Promise<T>
 }
+
+export const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse')
+    url.searchParams.set('lat', String(lat))
+    url.searchParams.set('lon', String(lng))
+    url.searchParams.set('format', 'json')
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Accept-Language': 'id',
+      },
+    })
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    return (data.display_name as string) ?? null
+  } catch {
+    return null
+  }
+}
