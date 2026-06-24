@@ -16,7 +16,7 @@ services:
     build:
       context: ./be
       dockerfile: Dockerfile
-    container_name: app-be
+    container_name: listrik-app-be
     restart: always
     env_file:
       - .env
@@ -28,6 +28,18 @@ services:
       - "traefik.http.routers.listrik.entrypoints=websecure"
       - "traefik.http.routers.listrik.tls.certresolver=cfresolver"
       - "traefik.http.services.listrik.loadbalancer.server.port=3000"
+
+  importer:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    container_name: listrik-importer
+    restart: always
+    command: bun run import
+    env_file:
+      - .env
+    depends_on:
+      - postgis
       
 volumes:
   postgis_data:
