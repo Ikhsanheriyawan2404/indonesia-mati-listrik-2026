@@ -19,7 +19,7 @@ export const createReportSchema = z.object({
   description: z.string()
     .trim()
     .min(10, { message: 'Deskripsi minimal 10 karakter' })
-    .max(1000, { message: 'Deskripsi maksimal 1000 karakter' }),
+    .max(100, { message: 'Deskripsi maksimal 100 karakter' }),
   started_at: z.string()
     .datetime({ message: 'started_at harus berupa format ISO 8601' })
     .optional()
@@ -47,6 +47,13 @@ export const getReportsQuerySchema = z.object({
   }
 )
 
+const INDONESIA_BBOX = {
+  MIN_LNG: 95.0,
+  MAX_LNG: 141.0,
+  MIN_LAT: -11.0,
+  MAX_LAT: 6.0,
+} as const;
+
 export class ReportService {
   private readonly aiModerationService: AiModerationService
 
@@ -54,8 +61,17 @@ export class ReportService {
     this.aiModerationService = new AiModerationService(env.AI_API_KEY)
   }
 
+  private isInsideIndonesia(lat: number, lng: number): boolean {
+    const { MIN_LNG, MAX_LNG, MIN_LAT, MAX_LAT } = INDONESIA_BBOX;
+    return lng >= MIN_LNG && lng <= MAX_LNG && lat >= MIN_LAT && lat <= MAX_LAT;
+  }
+
   async createReport(guestId: string, data: unknown): Promise<Report> {
     const validated = createReportSchema.parse(data)
+    
+    if (!this.isInsideIndonesia(validated.latitude, validated.longitude)) {
+      throw new BadRequestError("Koordinat lokasi di luar wilayah Indonesia!");
+    }
 
     const report = await this.reportRepository.create({
       ...validated,
