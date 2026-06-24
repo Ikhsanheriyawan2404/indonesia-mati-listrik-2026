@@ -238,6 +238,7 @@ export function ReportModal() {
     setAnonymous((prev) => {
       if (!prev) {
         setForm((f) => ({ ...f, reporter_name: '' }))
+        setErrors((current) => ({ ...current, reporter_name: undefined }))
       }
       return !prev
     })
@@ -289,8 +290,8 @@ export function ReportModal() {
       const payloadEndedAt = getEndedAtDate(endedAtType, payloadStartedAt, customEndedAt)
 
       const payload = {
-        reporter_name: anonymous ? null : (form.reporter_name.trim() || null),
-        description: form.description.trim() || null,
+        reporter_name: anonymous ? 'Anonim' : form.reporter_name.trim(),
+        description: form.description.trim(),
         latitude: selected?.latitude ?? 0,
         longitude: selected?.longitude ?? 0,
         started_at: payloadStartedAt.toISOString(),
@@ -308,9 +309,22 @@ export function ReportModal() {
       finalizeMarker()
       resetForm()
       setOpen(false)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Gagal mengirim laporan.'
-      toast.error(message)
+    } catch (err: any) {
+      const rawMessage = err instanceof Error ? err.message : 'Gagal mengirim laporan.';
+      let errorMessage = 'Gagal mengirim laporan.';
+      try {
+        const parsedError = JSON.parse(rawMessage);
+
+        if (parsedError.errors && Array.isArray(parsedError.errors) && parsedError.errors.length > 0) {
+          errorMessage = parsedError.errors[0].message;
+        } else if (parsedError.message) {
+          errorMessage = parsedError.message;
+        }
+      } catch (parseErr) {
+        errorMessage = rawMessage;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setLoading(false)
     }
@@ -364,12 +378,11 @@ export function ReportModal() {
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4 pt-1">
 
-            {/* Nama (opsional) */}
+            {/* Nama */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="reporter_name">
-                  Nama
-                  <span className="text-muted-foreground ml-1.5 text-xs font-normal">(opsional)</span>
+                  Nama <span aria-hidden="true" className="text-destructive">*</span>
                 </Label>
                 <button
                   type="button"
@@ -390,20 +403,26 @@ export function ReportModal() {
                 id="reporter_name"
                 name="reporter_name"
                 type="text"
-                placeholder={anonymous ? 'Dikirim sebagai anonim' : 'Nama kamu…'}
+                placeholder="Nama kamu..."
                 autoComplete="name"
                 disabled={anonymous}
-                value={anonymous ? '' : form.reporter_name}
+                value={anonymous ? 'Anonim' : form.reporter_name}
                 onChange={(e) => handleChange('reporter_name', e.target.value)}
                 className={anonymous ? 'text-muted-foreground italic' : ''}
+                aria-invalid={Boolean(errors.reporter_name)}
+                aria-describedby={errors.reporter_name ? 'reporter_name-error' : undefined}
               />
+              {errors.reporter_name && (
+                <p id="reporter_name-error" role="alert" className="text-destructive text-xs mt-1">
+                  {errors.reporter_name}
+                </p>
+              )}
             </div>
 
-            {/* Deskripsi (opsional) */}
+            {/* Deskripsi */}
             <div className="space-y-1.5">
               <Label htmlFor="description">
-                Deskripsi
-                <span className="text-muted-foreground ml-1.5 text-xs font-normal">(opsional)</span>
+                Deskripsi <span aria-hidden="true" className="text-destructive">*</span>
               </Label>
               <textarea
                 id="description"
@@ -413,7 +432,14 @@ export function ReportModal() {
                 value={form.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 resize-none"
+                aria-invalid={Boolean(errors.description)}
+                aria-describedby={errors.description ? 'description-error' : undefined}
               />
+              {errors.description && (
+                <p id="description-error" role="alert" className="text-destructive text-xs mt-1">
+                  {errors.description}
+                </p>
+              )}
             </div>
 
             {/* Lokasi (required) */}

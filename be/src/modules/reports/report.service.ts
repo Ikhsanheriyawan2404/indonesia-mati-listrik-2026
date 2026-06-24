@@ -8,9 +8,8 @@ import { moderationBroadcaster } from '../../shared/services/moderation-broadcas
 export const createReportSchema = z.object({
   reporter_name: z.string()
     .trim()
-    .max(100, { message: 'Nama pelapor maksimal 100 karakter' })
-    .optional()
-    .nullable(),
+    .min(3, { message: 'Nama pelapor minimal 3 karakter' })
+    .max(100, { message: 'Nama pelapor maksimal 100 karakter' }),
   latitude: z.number({ message: 'Latitude wajib diisi' })
     .min(-90, { message: 'Latitude harus antara -90 dan 90 derajat' })
     .max(90, { message: 'Latitude harus antara -90 dan 90 derajat' }),
@@ -19,9 +18,8 @@ export const createReportSchema = z.object({
     .max(180, { message: 'Longitude harus antara -180 dan 180 derajat' }),
   description: z.string()
     .trim()
-    .max(1000, { message: 'Deskripsi maksimal 1000 karakter' })
-    .optional()
-    .nullable(),
+    .min(10, { message: 'Deskripsi minimal 10 karakter' })
+    .max(1000, { message: 'Deskripsi maksimal 1000 karakter' }),
   started_at: z.string()
     .datetime({ message: 'started_at harus berupa format ISO 8601' })
     .optional()
@@ -64,14 +62,10 @@ export class ReportService {
       guest_id: guestId,
     })
     
-    const hasReporter = (report.reporter_name?.trim()?.length ?? 0) > 0;
-    const hasDescription = (report.description?.trim()?.length ?? 0) > 0;
-    if (hasReporter || hasDescription) {
-      this.runBackgroundModeration(Number(report.id), {
-        reporter_name: validated.reporter_name ?? null,
-        description: validated.description ?? null
-      });
-    }
+    this.runBackgroundModeration(Number(report.id), {
+      reporter_name: validated.reporter_name,
+      description: validated.description
+    });
     
     const now = new Date()
     return {
