@@ -61,10 +61,32 @@ X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
 ###
 
 ### Delete Report (Unauthorized - Using different X-Guest-ID)
-DELETE {{BASE_URL}}/reports/14
+DELETE {{BASE_URL}}/reports/10195
 Accept: application/json
-X-Guest-ID: 5415f5d9-1bed-4609-820a-hahaha
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
 
+### Get Report by ID
+GET {{BASE_URL}}/reports/1
+Accept: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
+
+### Vote Up (new report)
+POST {{BASE_URL}}/reports/1/votes
+Content-Type: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
+
+{
+  "vote_type": "UP"
+}
+
+### Vote Down
+POST {{BASE_URL}}/reports/1/votes
+Content-Type: application/json
+X-Guest-ID: 5415f5d9-1bed-4609-820a-59c73ac00a9e
+
+{
+  "vote_type": "DOWN"
+}
 
 ###
 GET https://nominatim.openstreetmap.org/reverse?lat=-1&lon=118&format=json

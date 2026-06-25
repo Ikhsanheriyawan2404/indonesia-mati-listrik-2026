@@ -1,4 +1,4 @@
-import { ReportRepository, Report } from './report.repository'
+import { ReportRepository, Report, ReportDetail, VoteType } from './report.repository'
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../shared/utils/errors'
 import { z } from 'zod'
 import { AiModerationService } from '../../shared/services/ai-moderation.service'
@@ -46,6 +46,12 @@ export const getReportsQuerySchema = z.object({
     path: ['minLng']
   }
 )
+
+export const voteReportSchema = z.object({
+  vote_type: z.enum(['UP', 'DOWN'], {
+    message: 'vote_type harus berupa "UP" atau "DOWN"',
+  }),
+})
 
 const INDONESIA_BBOX = {
   MIN_LNG: 95.0,
@@ -126,6 +132,58 @@ export class ReportService {
       ...report,
       status: new Date(report.started_at) < now ? 'history' : 'schedule'
     }))
+  }
+  
+  async getReportById(id: number, guestId: string): Promise<ReportDetail> {
+    if (isNaN(id)) {
+      throw new BadRequestError('ID report harus berupa angka valid.')
+    }
+
+    const report = await this.reportRepository.findById(id)
+
+    if (!report) {
+      throw new NotFoundError('Report tidak ditemukan.')
+    }
+
+    const userVote = await this.reportRepository.getUserVote(id, guestId)
+
+    return {
+      ...report,
+      up_count: Number((report as any).up_count ?? 0),
+      down_count: Number((report as any).down_count ?? 0),
+      is_mine: report.guest_id === guestId,
+      user_vote: userVote,
+    }
+  }
+
+  async voteReport(
+    id: number,
+    guestId: string,
+    body: unknown
+  ): Promise<{ up_count: number; down_count: number; user_vote: VoteType | null }> {
+    if (isNaN(id)) {
+      throw new BadRequestError('ID report harus berupa angka valid.')
+    }
+
+    const { vote_type } = voteReportSchema.parse(body)
+
+    const report = await this.reportRepository.findById(id)
+    if (!report) {
+      throw new NotFoundError('Report tidak ditemukan.')
+    }
+    
+    await this.reportRepository.toggleVote(id, guestId, vote_type)
+
+    const [updated, userVote] = await Promise.all([
+      this.reportRepository.findById(id),
+      this.reportRepository.getUserVote(id, guestId),
+    ])
+
+    return {
+      up_count: Number((updated as any)?.up_count ?? 0),
+      down_count: Number((updated as any)?.down_count ?? 0),
+      user_vote: userVote,
+    }
   }
 
   async deleteReport(id: number, guestId: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useLocation } from '@/lib/LocationContext'
 import { type Report, type ApiResponse, reportsToGeoJSON } from '@/lib/types'
@@ -240,65 +241,279 @@ export function Map() {
         const formattedTime = formatReportTime(props.started_at)
         const reporterName = props.reporter_name || 'Anonim'
 
-        const badgeHtml = props.status === 'history'
-          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400">
-              <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-              Riwayat Padam
-             </span>`
-          : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              Info / Jadwal
-             </span>`
+        // ─── Helpers ─────────────────────────────────────────────────────────
 
-        const descHtml = props.description
-          ? `<div class="bg-muted/40 p-2 rounded-md border border-border/20 text-xs italic text-foreground/90 break-words leading-normal">
-              "${props.description}"
-             </div>`
-          : ''
+        /** Create an SVG element from a raw path string */
+        const makeSvg = (pathD: string, color?: string): SVGSVGElement => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          svg.setAttribute('width', '12')
+          svg.setAttribute('height', '12')
+          svg.setAttribute('viewBox', '0 0 24 24')
+          svg.setAttribute('fill', 'none')
+          svg.setAttribute('stroke', 'currentColor')
+          svg.setAttribute('stroke-width', '2')
+          svg.setAttribute('stroke-linecap', 'round')
+          svg.setAttribute('stroke-linejoin', 'round')
+          if (color) svg.style.color = color
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+          path.setAttribute('d', pathD)
+          svg.appendChild(path)
+          return svg
+        }
 
+        const makeEl = <K extends keyof HTMLElementTagNameMap>(
+          tag: K,
+          cls: string,
+          text?: string
+        ): HTMLElementTagNameMap[K] => {
+          const el = document.createElement(tag)
+          el.className = cls
+          if (text !== undefined) el.textContent = text
+          return el
+        }
+
+        // ─── Root container ───────────────────────────────────────────────────
+        const root = makeEl('div', 'flex flex-col gap-2.5 w-60 py-1 font-sans')
+
+        // ─── Header row (badge + id) ──────────────────────────────────────────
+        const headerRow = makeEl('div', 'flex items-center justify-between')
+
+        const badge = makeEl('span',
+          props.status === 'history'
+            ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400'
+            : 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400'
+        )
+        const badgeDot = makeEl('span',
+          props.status === 'history'
+            ? 'w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse'
+            : 'w-1.5 h-1.5 rounded-full bg-blue-500'
+        )
+        badge.appendChild(badgeDot)
+        badge.appendChild(document.createTextNode(props.status === 'history' ? ' Riwayat Padam' : ' Info / Jadwal'))
+
+        const idLabel = makeEl('div', 'text-xs text-muted-foreground', `#${props.id}`)
+        headerRow.appendChild(badge)
+        headerRow.appendChild(idLabel)
+        root.appendChild(headerRow)
+
+        // ─── Reporter + time row ──────────────────────────────────────────────
+        const metaRow = makeEl('div', 'flex flex-col gap-1 text-xs text-muted-foreground border-b border-border/40 pb-2')
+
+        const reporterRow = makeEl('div', 'flex items-center gap-1.5')
+        const userSvg = makeSvg('M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2')
+        const circlePath = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+        circlePath.setAttribute('cx', '12'); circlePath.setAttribute('cy', '7'); circlePath.setAttribute('r', '4')
+        userSvg.appendChild(circlePath)
+        userSvg.style.color = 'var(--muted-foreground)'
+        reporterRow.appendChild(userSvg)
+        reporterRow.appendChild(makeEl('span', 'font-medium text-foreground', reporterName))
+        metaRow.appendChild(reporterRow)
+
+        const timeRow = makeEl('div', 'flex items-center gap-1.5')
+        const clockSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        clockSvg.setAttribute('width', '12'); clockSvg.setAttribute('height', '12')
+        clockSvg.setAttribute('viewBox', '0 0 24 24'); clockSvg.setAttribute('fill', 'none')
+        clockSvg.setAttribute('stroke', 'currentColor'); clockSvg.setAttribute('stroke-width', '2')
+        clockSvg.setAttribute('stroke-linecap', 'round'); clockSvg.setAttribute('stroke-linejoin', 'round')
+        clockSvg.style.color = 'var(--muted-foreground)'
+        const clockCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+        clockCircle.setAttribute('cx', '12'); clockCircle.setAttribute('cy', '12'); clockCircle.setAttribute('r', '10')
+        const clockPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline')
+        clockPolyline.setAttribute('points', '12 6 12 12 16 14')
+        clockSvg.appendChild(clockCircle); clockSvg.appendChild(clockPolyline)
+        timeRow.appendChild(clockSvg)
+        timeRow.appendChild(makeEl('span', '', formattedTime))
+        metaRow.appendChild(timeRow)
+        root.appendChild(metaRow)
+
+        // ─── Description ──────────────────────────────────────────────────────
+        if (props.description) {
+          const descBox = makeEl('div', 'bg-muted/40 p-2 rounded-md border border-border/20 text-xs italic text-foreground/90 break-words leading-normal')
+          descBox.textContent = `"${props.description}"`
+          root.appendChild(descBox)
+        }
+
+        // ─── Voting section ───────────────────────────────────────────────────
+        const voteRow = makeEl('div', 'flex items-center justify-between border-t border-border/40 pt-2')
+        voteRow.appendChild(makeEl('span', 'text-[11px] font-medium text-muted-foreground', 'Validasi?'))
+
+        const voteBtnsWrap = makeEl('div', 'flex items-center gap-1.5')
+
+        // Chevron UP svg
+        const makeChevronSvg = (direction: 'up' | 'down', colorClass: string): SVGSVGElement => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          svg.setAttribute('width', '12'); svg.setAttribute('height', '12')
+          svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none')
+          svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2.5')
+          svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round')
+          svg.setAttribute('class', colorClass)
+          const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+          p.setAttribute('d', direction === 'up' ? 'm18 15-6-6-6 6' : 'm6 9 6 6 6-6')
+          svg.appendChild(p)
+          return svg
+        }
+
+        const upCountSpan   = makeEl('span', 'text-[11px]', '—')
+        const downCountSpan = makeEl('span', 'text-[11px]', '—')
+
+        const upBtn = makeEl('button', 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground text-xs font-semibold opacity-60 cursor-not-allowed')
+        upBtn.setAttribute('disabled', 'true')
+        upBtn.setAttribute('aria-label', 'Upvote')
+        upBtn.appendChild(makeChevronSvg('up', 'text-emerald-600'))
+        upBtn.appendChild(upCountSpan)
+
+        const downBtn = makeEl('button', 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground text-xs font-semibold opacity-60 cursor-not-allowed')
+        downBtn.setAttribute('disabled', 'true')
+        downBtn.setAttribute('aria-label', 'Downvote')
+        downBtn.appendChild(makeChevronSvg('down', 'text-rose-600'))
+        downBtn.appendChild(downCountSpan)
+
+        voteBtnsWrap.appendChild(upBtn)
+        voteBtnsWrap.appendChild(downBtn)
+        voteRow.appendChild(voteBtnsWrap)
+        root.appendChild(voteRow)
+
+        // ─── Delete section (hidden until fetch confirms is_mine) ─────────────
+        const deleteSection = makeEl('div', '') // hidden until confirmed
+        root.appendChild(deleteSection)
+
+        // ─── Vote state ───────────────────────────────────────────────────────
+        let currentUserVote: string | null = null
+        let currentUpCount   = 0
+        let currentDownCount = 0
+        let isVoting = false
+
+        const IDLE_CLASS        = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors duration-150 bg-muted text-muted-foreground hover:bg-muted/80'
+        const ACTIVE_UP_CLASS   = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors duration-150 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 ring-1 ring-emerald-400/40'
+        const ACTIVE_DOWN_CLASS = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors duration-150 bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 ring-1 ring-rose-400/40'
+
+        /** Sync vote button appearance — uses direct DOM refs, no querySelector */
+        const syncVoteUI = (upCount: number, downCount: number, userVote: string | null, loading: boolean) => {
+          upCountSpan.textContent   = String(upCount)
+          downCountSpan.textContent = String(downCount)
+
+          upBtn.className   = loading ? IDLE_CLASS + ' opacity-60 cursor-not-allowed' : (userVote === 'UP'   ? ACTIVE_UP_CLASS   : IDLE_CLASS)
+          downBtn.className = loading ? IDLE_CLASS + ' opacity-60 cursor-not-allowed' : (userVote === 'DOWN' ? ACTIVE_DOWN_CLASS : IDLE_CLASS)
+
+          if (loading) {
+            upBtn.setAttribute('disabled', 'true')
+            downBtn.setAttribute('disabled', 'true')
+          } else {
+            upBtn.removeAttribute('disabled')
+            downBtn.removeAttribute('disabled')
+          }
+        }
+
+        const handleVote = async (voteType: 'UP' | 'DOWN') => {
+          if (isVoting) return
+          isVoting = true
+          syncVoteUI(currentUpCount, currentDownCount, currentUserVote, true)
+
+          await new Promise(resolve => setTimeout(resolve, 1000))
+
+          try {
+            const res = await api<{ message: string; data: { up_count: number; down_count: number; user_vote: string | null } }>(
+              `/reports/${props.id}/votes`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vote_type: voteType }),
+              }
+            )
+            currentUpCount   = res.data.up_count
+            currentDownCount = res.data.down_count
+            currentUserVote  = res.data.user_vote
+            syncVoteUI(currentUpCount, currentDownCount, currentUserVote, false)
+          } catch (err: any) {
+            syncVoteUI(currentUpCount, currentDownCount, currentUserVote, false)
+            if (err.status === 429) {
+              toast.error('Batas limitasi request terlampaui. Silakan coba beberapa saat lagi.')
+            } else {
+              toast.error('Gagal memproses vote. Silakan coba lagi.')
+            }
+          } finally {
+            isVoting = false
+          }
+        }
+
+        upBtn.addEventListener('click', () => handleVote('UP'))
+        downBtn.addEventListener('click', () => handleVote('DOWN'))
+
+        // ─── Mount popup ──────────────────────────────────────────────────────
         if (popupRef.current) popupRef.current.remove()
         popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '270px' })
           .setLngLat(coords)
-          .setHTML(
-            `<div class="flex flex-col gap-2.5 w-60 py-1 font-sans">
-              <!-- Top header row: Badge & Source -->
-              <div class="flex items-center justify-between">
-                ${badgeHtml}
-                <div class="text-xs text-muted-foreground">#${props.id}</div>
-              </div>
-
-              <!-- Reporter info & Time -->
-              <div class="flex flex-col gap-1 text-xs text-muted-foreground border-b border-border/40 pb-2">
-                <div class="flex items-center gap-1.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/60"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  <span class="font-medium text-foreground">${reporterName}</span>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/60"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span>${formattedTime}</span>
-                </div>
-              </div>
-
-              <!-- Description -->
-              ${descHtml}
-
-              <!-- Voting section (static) -->
-              <div class="flex items-center justify-between border-t border-border/40 pt-2">
-                <span class="text-[11px] font-medium text-muted-foreground">Validasi?</span>
-                <div class="flex items-center gap-1.5">
-                  <button class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted hover:bg-muted text-muted-foreground text-xs font-semibold cursor-not-allowed opacity-80" disabled aria-label="Upvote">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600"><path d="m18 15-6-6-6 6"/></svg>
-                    <span class="text-[11px]">0</span>
-                  </button>
-                  <button class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted hover:bg-muted text-muted-foreground text-xs font-semibold cursor-not-allowed opacity-80" disabled aria-label="Downvote">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-rose-600"><path d="m6 9 6 6 6-6"/></svg>
-                    <span class="text-[11px]">0</span>
-                  </button>
-                </div>
-              </div>
-            </div>`
-          )
+          .setDOMContent(root)
           .addTo(map)
+
+        // ─── Fetch detail async → fill counts + reveal delete ─────────────────
+        api<ApiResponse<Report & { is_mine: boolean; user_vote: string | null; up_count: number; down_count: number }>>(`/reports/${props.id}`, {
+          headers: { 'Accept': 'application/json' }
+        })
+          .then((res) => {
+            if (!res?.data) return
+
+            currentUpCount   = res.data.up_count   ?? 0
+            currentDownCount = res.data.down_count ?? 0
+            currentUserVote  = res.data.user_vote  ?? null
+            syncVoteUI(currentUpCount, currentDownCount, currentUserVote, false)
+
+            if (res.data.is_mine) {
+              // Build delete button via DOM API
+              deleteSection.className = 'flex items-center justify-end border-t border-border/40 pt-2'
+
+              const trashSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+              trashSvg.setAttribute('width', '12'); trashSvg.setAttribute('height', '12')
+              trashSvg.setAttribute('viewBox', '0 0 24 24'); trashSvg.setAttribute('fill', 'none')
+              trashSvg.setAttribute('stroke', 'currentColor'); trashSvg.setAttribute('stroke-width', '2')
+              trashSvg.setAttribute('stroke-linecap', 'round'); trashSvg.setAttribute('stroke-linejoin', 'round')
+              ;['M3 6h18', 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6', 'M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2'].forEach(d => {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+                p.setAttribute('d', d)
+                trashSvg.appendChild(p)
+              })
+
+              const deleteLabel = makeEl('span', '', 'Hapus')
+              const deleteBtn = makeEl('button',
+                'inline-flex items-center gap-1.5 px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 dark:text-rose-400 text-[11px] font-semibold transition-colors duration-200'
+              )
+              deleteBtn.setAttribute('aria-label', 'Hapus laporan')
+              deleteBtn.appendChild(trashSvg)
+              deleteBtn.appendChild(deleteLabel)
+              deleteSection.appendChild(deleteBtn)
+
+              deleteBtn.addEventListener('click', async () => {
+                if (!confirm('Apakah Anda yakin ingin menghapus laporan ini?')) return
+
+                deleteBtn.setAttribute('disabled', 'true')
+                deleteLabel.textContent = 'Menghapus...'
+                trashSvg.style.display = 'none'
+
+                try {
+                  await api(`/reports/${props.id}`, { method: 'DELETE' })
+                  toast.success('Laporan berhasil dihapus.')
+                  popupRef.current?.remove()
+                  fetchReports(map)
+                } catch (err: any) {
+                  deleteBtn.removeAttribute('disabled')
+                  deleteLabel.textContent = 'Hapus'
+                  trashSvg.style.display = ''
+                  if (err.status === 429) {
+                    toast.error('Batas limitasi request terlampaui. Silakan coba beberapa saat lagi.')
+                  } else {
+                    let msg = 'Gagal menghapus laporan.'
+                    try { msg = JSON.parse(err.message)?.message || msg } catch { msg = err.message || msg }
+                    toast.error(msg)
+                  }
+                }
+              })
+            }
+          })
+          .catch((err: any) => {
+            if (err.status === 429) {
+              toast.error('Batas limitasi request terlampaui. Silakan coba beberapa saat lagi.')
+            }
+          })
       })
 
       // Cursor feedback

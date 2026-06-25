@@ -30,8 +30,8 @@
 * [x] `POST /reports` — buat laporan baru
 * [x] `GET /reports?bbox=` — get semua laporan (bbox query)
 * [x] `DELETE /reports/:id` — hapus laporan berdasarkan kepemilikan `guest_id`
-* [ ] ~~GET /reports/:id — detail satu laporan + aggregasi realtime vote count up/down~~
-* [ ] `POST /reports/:id/votes` — upvote / downvote dengan smart toggle & switch logic per `guest_id`
+* [x] GET /reports/:id — detail satu laporan + aggregasi realtime vote count up/down
+* [x] `POST /reports/:id/votes` — upvote / downvote dengan smart toggle & switch logic per `guest_id`
 
 ### Business Logic & Integrations
 
@@ -63,7 +63,7 @@
 * [x] Layer `unclustered-point` (circle individual per status)
 * [x] Klik cluster → zoom in (`getClusterExpansionZoom`)
 * [x] Event `moveend` + debounce 300ms → fetch ulang data by bbox & update source data
-* [ ] ~~Klik individual marker → tampilkan popup detail (ambil data dinamis dari `GET /reports/:id`)~~
+* [x] Klik individual marker → tampilkan popup detail (ambil data dinamis dari `GET /reports/:id`)
 
 ### Komponen UI & Interaksi
 
@@ -71,11 +71,11 @@
 * [x] `ReportModal.tsx` — FAB + Long press map to trigger dialog form tambah laporan
 * [x] Integrasi nama lokasi otomatis hasil reverse geocoding Nominatim di `ReportModal.tsx` (bukan cuma angka koordinat mentah)
 * [x] Dynamic Popup Component (saat marker diklik):
-* [ ] Tombol interaktif Upvote / Downvote (berubah state warna jika aktif, hit `POST /reports/:id/votes`)
-* [ ] Tampilkan jumlah total count vote up dan down secara realtime
+* [x] Tombol interaktif Upvote / Downvote (berubah state warna jika aktif, hit `POST /reports/:id/votes`)
+* [x] Tampilkan jumlah total count vote up dan down secara realtime
 * [x] bugs marker lama munculnya setelah create/post report (harus nunggu geser/zoomin/out)
 * [x] realtime notif post report tidak diterima (kena flaged) (websocket)
-* [ ] ~~tombol hapus report punya sendiri~~
+* [x] tombol hapus report punya sendiri
 
 ---
 
@@ -92,6 +92,3 @@
 * [ ] Atur aelah bos, gw ngikut
 
 ---
-
-posisi tombol tambah kurang bagus bro
-cek clustering

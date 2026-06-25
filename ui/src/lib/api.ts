@@ -2,6 +2,15 @@ import { getGuestId } from "./utils"
 
 export const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000'
 
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+    this.name = 'ApiError'
+  }
+}
+
 export const api = async <T = any>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const res = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
@@ -14,7 +23,7 @@ export const api = async <T = any>(endpoint: string, options: RequestInit = {}):
 
   if (!res.ok) {
     const errorText = await res.text()
-    throw new Error(errorText || `HTTP Error! status: ${res.status}`)
+    throw new ApiError(errorText || `HTTP Error! status: ${res.status}`, res.status)
   }
 
   return res.json() as Promise<T>

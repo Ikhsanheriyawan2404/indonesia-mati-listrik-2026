@@ -11,9 +11,11 @@ const reportService = new ReportService(reportRepository)
 const reportHandler = new ReportHandler(reportService)
 
 reportsRouter.use('*', guestIdMiddleware())
+reportsRouter.post('/:id/votes', reportHandler.vote)
 
 reportsRouter.post('/', reportHandler.create)
 reportsRouter.get('/', reportHandler.getAll)
-// reportsRouter.delete('/:id', reportHandler.delete)
+reportsRouter.get('/:id', reportHandler.getById)
+reportsRouter.delete('/:id', reportHandler.delete)
 
 export default reportsRouter

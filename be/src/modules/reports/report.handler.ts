@@ -25,6 +25,17 @@ export class ReportHandler {
     });
   }
 
+  
+  getById = async (c: Context) => {
+    const guestId = c.get('guestId') as string
+    const id = Number(c.req.param('id'))
+    const report = await this.reportService.getReportById(id, guestId)
+    return c.json({
+      message: 'Report berhasil diambil.',
+      data: report
+    })
+  }
+  
   delete = async (c: Context) => {
     const guestId = c.get('guestId') as string
     const id = Number(c.req.param('id'))
@@ -33,6 +44,18 @@ export class ReportHandler {
     
     return c.json({
       message: 'Report berhasil dihapus.'
+    })
+  }
+  
+  vote = async (c: Context) => {
+    const guestId = c.get('guestId') as string
+    const id = Number(c.req.param('id'))
+    const body = await c.req.json()
+    
+    const result = await this.reportService.voteReport(id, guestId, body)
+    return c.json({
+      message: 'Vote processed',
+      data: result,
     })
   }
 }
